@@ -1,35 +1,140 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import React, { useState, useEffect } from "react";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  useNavigate,
+  useParams,
+  useLocation,
+} from "react-router-dom";
+import TabelaLivros from "./components/TabelaLivros";
+import CadastrarLivros from "./components/CadastrarLivros";
+import NotFound from "./components/NotFound";
+import SplashScreen from "./components/SplashScreen";
+import Header from "./components/Header";
+import Login from "./pages/Login";
+import AuthProvider from "./context/AuthProvider";
+import PrivateRoute from "./routes/PrivateRoute";
 
-function App() {
-  const [count, setCount] = useState(0)
+// --- Componente principal ---
+const App = () => {
+  const [livros, setLivros] = useState([
+    {
+      id: 1,
+      isbn: "978-85-7522-403-8",
+      titulo: "HTML5 - 2ª Edição",
+      autor: "Maurício Samy Silva",
+    },
+    {
+      id: 2,
+      isbn: "978-85-7522-807-4",
+      titulo: "Introdução ao Pentest",
+      autor: "Daniel Moreno",
+    },
+    {
+      id: 3,
+      isbn: "978-85-7522-780-8",
+      titulo: "Internet das Coisas",
+      autor: "Ricardo Ogliari",
+    },
+  ]);
+
+  const [carregando, setCarregando] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setCarregando(false), 2000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const inserirLivro = (livro) => {
+    livro.id = livros.length + 1;
+    setLivros((prev) => [...prev, livro]);
+  };
+
+  const editarLivro = (livro) => {
+    const atualizados = livros.map((p) => (p.id === livro.id ? livro : p));
+    setLivros(atualizados);
+  };
+
+  const removerLivro = (livro) => {
+    if (window.confirm("Remover esse livro?")) {
+      setLivros((prev) => prev.filter((p) => p.isbn !== livro.isbn));
+    }
+  };
+
+  if (carregando) return <SplashScreen />;
+
+  return (
+    <Router>
+      <AuthProvider>
+        <AppLayout
+          livros={livros}
+          inserirLivro={inserirLivro}
+          editarLivro={editarLivro}
+          removerLivro={removerLivro}
+        />
+      </AuthProvider>
+    </Router>
+  );
+};
+
+// --- Layout com rotas protegidas e header ---
+const AppLayout = ({ livros, inserirLivro, editarLivro, removerLivro }) => {
+  const location = useLocation();
+  const mostrarHeader = location.pathname !== "/login";
 
   return (
     <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
-}
+      {mostrarHeader && <Header />}
+      <Routes>
+        <Route path="/login" element={<Login />} />
 
-export default App
+        {/* Grupo de rotas protegidas */}
+        <Route element={<PrivateRoute />}>
+          <Route
+            path="/"
+            element={
+              <TabelaLivros livros={livros} removerLivro={removerLivro} />
+            }
+          />
+          <Route
+            path="/cadastrar"
+            element={
+              <CadastrarLivros
+                inserirLivro={inserirLivro}
+                livro={{ id: 0, isbn: "", titulo: "", autor: "" }}
+              />
+            }
+          />
+          <Route
+            path="/editar/:isbnLivro"
+            element={
+              <CadastrarLivrosWrapper
+                livros={livros}
+                editarLivro={editarLivro}
+              />
+            }
+          />
+        </Route>
+
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </>
+  );
+};
+
+// --- Wrapper para edição ---
+const CadastrarLivrosWrapper = ({ livros, editarLivro }) => {
+  const { isbnLivro } = useParams();
+  const navigate = useNavigate();
+  const livro = livros.find((livro) => livro.isbn === isbnLivro);
+
+  if (!livro) {
+    navigate("/");
+    return null;
+  }
+
+  return <CadastrarLivros livro={livro} editarLivro={editarLivro} />;
+};
+
+export default App;
